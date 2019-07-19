@@ -70,3 +70,7 @@ plot_timer = None
 
 win.show()
 app.exec()
+# print(time.time())
+# time.sleep(5)
+# print(time.time())
+# sys.exit()
