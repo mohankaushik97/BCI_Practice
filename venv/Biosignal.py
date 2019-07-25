@@ -40,7 +40,7 @@ class Signal(object):
         # Creating the plot
         self.graph = self.main_plot.plot()
         self.graph_time = np.arange(self.main_plot_t_start, self.main_plot_t_end / self.Fs, self.sample_interval)
-        self.graph_pos = self.graph_time[-1]  # Place Cursor at the far right of the screen
+        self.graph_pos = self.graph_time[0]  # Place Cursor at the far right of the screen
 
         # FFT Variables
         self.fft_sample_size = 1000
@@ -67,7 +67,7 @@ class Signal(object):
         self.graph_head = 0
         self.graph_tail = self.graph_head
         self.graph_buff = int(self.y_max / 2) * np.ones(self.graph_N, dtype='uint16')
-        self.serial_thread = threading.Thread(target = self.serial_read, daemon = True)
+        self.serial_thread = threading.Thread(target=self.serial_read, daemon=True)
         self.ser = None
         self.plot_timer = None
 
@@ -89,16 +89,16 @@ class Signal(object):
             return
 
         # create log file
-        self.filename = 'home/mohan/Desktop/BCI_Practice/New' + time.ctime() + '.csv'
+        self.filename = '/Users/mohankaushik/Desktop/BCI_Practice/New/' + time.ctime() + '.csv'
         self.filename = self.filename.replace(':', '-')
-        print('Opening data log file' + self.fimename + '...')
-        self.logfile = open(self.filename, 'w')
+        print('Opening data log file' + self.filename + '...')
+        self.logfile = open(self.filename, 'w+')
 
         if not self.logfile:
             print('Failed to open logfile')
             return
 
-        # Create a timer to update graph every timeout
+        # Create a timer to update graph every timeoutN
         self.plot_timer = QtCore.QTimer()
         self.plot_timer.timeout.connect(self.update_plot)
         self.plot_timer.start(25)
@@ -110,34 +110,43 @@ class Signal(object):
 
     def serial_read(self):
         self.ser.reset_input_buffer()
-        start_up = True
         print("waiting for uC")
+        while True:
+            # while self.ser.inWaiting() < 2:
+                # print(self.ser.inWaiting())
+            # A = self.ser.read()
+            # B = self.ser.readline()
+            # print(A)
+            # print(B)
 
+            while self.ser.inWaiting() >= 2:
+                print(self.ser.inWaiting())
+                print("done waiting")
+                self.graph_data_read = True
+                lowbyte = self.ser.read()
+                highbyte = self.ser.read()
+                # print(lowbyte)
 
-        while self.ser.inWaiting() >=2:
+                self.graph_buff[:-1] = self.graph_buff[1:]
+                self.graph_buff[-1] = (ord(highbyte) << 8) + ord(lowbyte)
+                # print(self.graph_buff[-1])
 
-            self.graph_data_read = True
-            lowbyte = self.ser.read()
-            highbyte = self.ser.read()
-
-            self.graph_buff[:-1] = self.graph_buff[1:]
-            self.graph_buff[-1] = (ord(highbyte) << 8) + ord(lowbyte)
-
-            self.graph_time[:-1] = self.graph_time[1:]
+                self.graph_time[:-1] = self.graph_time[1:]
             # shift sursor
-            self.graph_pos += self.sample_interval
-            self.graph_time[-1] = self.graph_pos
+                self.graph_pos += self.sample_interval
+                self.graph_time[-1] = self.graph_pos
 
             # Write value to log file
-            self.logfile.write(str(self.graph_buff[-1]) + '\n')
+                self.logfile.write(str(self.graph_buff[-1]) + '\n')
 
             # Shift head forward
-            self.graph_head = (self.graph_head + 1) % self.graph_N
+                self.graph_head = (self.graph_head + 1) % self.graph_N
 
-            self.fft_sample_num += 1
-            if self.fft_sample_num ==self.fft_sample_size:
-                self.fft_sample_num = 0
-                self.calc()
+                self.fft_sample_num += 1
+                if self.fft_sample_num == self.fft_sample_size:
+                    self.fft_sample_num = 0
+                    self.calc()
+                print("done calc")
 
     def update_plot(self):
         # Only update plot is data has been read
@@ -165,7 +174,6 @@ class Signal(object):
         # Set FFT data
         self.fft_graph.setData(self.fft_freq, self.fft_graph_fft_mag)
 
-
     def show(self):
         self.win.show()
         self.app.exec()
@@ -176,5 +184,5 @@ class Signal(object):
 
 
 if __name__ == '__main__':
-        signal = Signal(None,'COM5')
+        signal = Signal(None, '/dev/cu.usbmodem14203')
         signal.start()
